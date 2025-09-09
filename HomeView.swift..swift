@@ -10,6 +10,7 @@ import SwiftUI
 
 struct HomeView: View {
     @State private var isConnected = false
+    @State private var isConnecting = false
     @State private var showSettings = false
     @State private var activeMenu: SettingsMenu? = nil
     @State private var showAbout = false
@@ -81,11 +82,8 @@ struct HomeView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)]),
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            DSColor.background
+                .ignoresSafeArea()
             
             VStack(spacing: 20) {
                 // Settings button
@@ -111,12 +109,15 @@ struct HomeView: View {
                 // Banner centered
                 if !showSettings && !showAbout {
                     Text(t["banner"]!)
-                        .foregroundColor(.white)
-                        .font(.footnote)
-                        .bold()
+                        .foregroundColor(DSColor.textPrimary)
+                        .font(DSTypography.footnote)
                         .padding(8)
-                        .background(Color.blue)
-                        .cornerRadius(8)
+                        .background(DSColor.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DSRadii.sm)
+                                .stroke(DSColor.border, lineWidth: 1)
+                        )
+                        .cornerRadius(DSRadii.sm)
                 }
                 
                 Spacer()
@@ -124,37 +125,29 @@ struct HomeView: View {
                 // VPN UI
                 if !showSettings && !showAbout {
                     VStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(isConnected ? Color.green : Color.red)
-                                .frame(width: 150, height: 150)
-                                .shadow(radius: 10)
-                                .animation(.easeInOut, value: isConnected)
-                            
-                            Image(systemName: isConnected ? "lock.open.fill" : "lock.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 70, height: 70)
-                                .foregroundColor(.white)
-                        }
-                        Text(isConnected ? t["vpnConnected"]! : t["vpnDisconnected"]!)
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .bold()
-                        
+                        VPNStatusIndicator(isConnected: isConnected)
+                            .animation(.easeInOut, value: isConnected)
+                        Text(isConnected ? t["vpnConnected"]! : (isConnecting ? "Connecting..." : t["vpnDisconnected"]!))
+                            .font(DSTypography.headline)
+                            .foregroundColor(DSColor.textPrimary)
                         Button(action: {
-                            withAnimation(.spring()) {
-                                isConnected.toggle()
+                            guard !isConnecting else { return }
+                            if isConnected {
+                                withAnimation(.spring()) { isConnected = false }
+                            } else {
+                                isConnecting = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                    withAnimation(.spring()) {
+                                        isConnected = true
+                                        isConnecting = false
+                                    }
+                                }
                             }
                         }) {
-                            Text(isConnected ? t["disconnect"]! : t["connect"]!)
-                                .foregroundColor(.white)
-                                .bold()
-                                .padding()
-                                .frame(width: 220)
-                                .background(isConnected ? Color.red : Color.blue)
-                                .cornerRadius(30)
+                            Text(isConnected ? t["disconnect"]! : (isConnecting ? "Connecting..." : t["connect"]!))
                         }
+                        .buttonStyle(DSButtonStyle(kind: isConnected ? .secondary : .primary))
+                        .disabled(isConnecting)
                     }
                 }
                 Spacer()
@@ -162,7 +155,7 @@ struct HomeView: View {
             
             // Dim background
             if showSettings || showAbout {
-                Color.black.opacity(0.35)
+                Color.black.opacity(0.45)
                     .ignoresSafeArea()
                     .onTapGesture {
                         withAnimation {
@@ -177,14 +170,14 @@ struct HomeView: View {
             if showSettings {
                 VStack(spacing: 16) {
                     if activeMenu == nil {
-                        SettingsRow(title: t["settings"]!, iconName: "gearshape")
+                        DSRow(title: t["settings"]!, iconName: "gearshape")
                             .onTapGesture { withAnimation { activeMenu = .language } }
-                        SettingsRow(title: t["feedback"]!, iconName: "pencil")
+                        DSRow(title: t["feedback"]!, iconName: "pencil")
                             .onTapGesture { withAnimation { activeMenu = .feedback } }
                         Link(destination: URL(string: "https://t.me/+iNVtHj3_3tZiZWEy")!) {
-                            SettingsRow(title: t["telegram"]!, iconName: "paperplane")
+                            DSRow(title: t["telegram"]!, iconName: "paperplane")
                         }
-                        SettingsRow(title: t["about"]!, iconName: "info.circle")
+                        DSRow(title: t["about"]!, iconName: "info.circle")
                             .onTapGesture {
                                 withAnimation {
                                     showSettings = false
@@ -212,8 +205,12 @@ struct HomeView: View {
                     }
                 }
                 .padding()
-                .background(Color.white)
-                .cornerRadius(16)
+                .background(DSColor.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadii.lg)
+                        .stroke(DSColor.border, lineWidth: 1)
+                )
+                .cornerRadius(DSRadii.lg)
                 .frame(maxWidth: 360)
             }
             
@@ -230,29 +227,19 @@ struct HomeView: View {
                     .foregroundColor(.blue)
                 }
                 .padding()
-                .background(Color.white)
-                .cornerRadius(16)
+                .background(DSColor.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadii.lg)
+                        .stroke(DSColor.border, lineWidth: 1)
+                )
+                .cornerRadius(DSRadii.lg)
                 .frame(maxWidth: 300)
             }
         }
     }
 }
 
-// MARK: - Settings Row
-struct SettingsRow: View {
-    var title: String
-    var iconName: String
-    var body: some View {
-        HStack {
-            Text(title).foregroundColor(.black)
-            Spacer()
-            Image(systemName: iconName).foregroundColor(.blue)
-        }
-        .padding()
-        .background(Color(white: 0.95))
-        .cornerRadius(10)
-    }
-}
+// MARK: - Replaced SettingsRow with DSRow
 
 // MARK: - Language menu
 struct LanguageMenu: View {
@@ -278,7 +265,7 @@ struct LanguageMenu: View {
     
     var body: some View {
         VStack {
-            Text(title).font(.headline)
+            Text(title).font(DSTypography.headline).foregroundColor(DSColor.textPrimary)
             Picker("", selection: $tempSelection) {
                 ForEach(languages, id: \.self) { Text($0).tag($0) }
             }
@@ -287,10 +274,10 @@ struct LanguageMenu: View {
             
             HStack {
                 Button(cancelText) { tempSelection = chosenLanguage; onCancel() }
-                    .foregroundColor(.blue)
+                    .buttonStyle(DSButtonStyle(kind: .secondary))
                 Spacer()
                 Button(okText) { chosenLanguage = tempSelection; onOK() }
-                    .foregroundColor(.blue)
+                    .buttonStyle(DSButtonStyle(kind: .primary))
             }
         }
     }
@@ -308,23 +295,39 @@ struct FeedbackMenu: View {
     var onSubmit: (String, String) -> Void
     
     var body: some View {
-        VStack {
+        VStack(spacing: DSSpacing.md) {
             TextField(emailPlaceholder, text: $email)
-                .padding().background(Color(white: 0.95)).cornerRadius(8)
+                .font(DSTypography.body)
+                .foregroundColor(DSColor.textPrimary)
+                .padding(DSSpacing.sm)
+                .background(DSColor.surfaceElevated)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadii.md).stroke(DSColor.border, lineWidth: 1)
+                )
+                .cornerRadius(DSRadii.md)
             ZStack(alignment: .topLeading) {
                 if opinion.isEmpty {
-                    Text(opinionPlaceholder).foregroundColor(.gray).padding(10)
+                    Text(opinionPlaceholder)
+                        .foregroundColor(DSColor.textPrimary)
+                        .padding(10)
+                        .allowsHitTesting(false)
                 }
-                TextEditor(text: $opinion).frame(height: 100)
+                TextEditor(text: $opinion)
+                    .frame(height: 100)
+                    .foregroundColor(DSColor.textPrimary)
+                    .background(Color.clear)
             }
-            .background(Color(white: 0.95)).cornerRadius(8)
+            .padding(4)
+            .background(DSColor.surfaceElevated)
+            .overlay(
+                RoundedRectangle(cornerRadius: DSRadii.md).stroke(DSColor.border, lineWidth: 1)
+            )
+            .cornerRadius(DSRadii.md)
             HStack {
                 Button(cancelText) { onCancel() }
-                    .foregroundColor(.white)
-                    .padding().background(Color.gray).cornerRadius(10)
+                    .buttonStyle(DSButtonStyle(kind: .secondary))
                 Button(sendText) { onSubmit(email, opinion) }
-                    .foregroundColor(.white)
-                    .padding().background(Color.blue).cornerRadius(10)
+                    .buttonStyle(DSButtonStyle(kind: .primary))
             }
         }
     }
